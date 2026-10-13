@@ -3,7 +3,9 @@
 **Lightweight MuJoCo pick-and-place environments for VLA research**, with a UR5e arm and a
 Robotiq 2F-85 gripper.
 
-![Stack cubes demo](media/stack_cubes.gif)
+![Scripted policy on PickCube, PlaceInBin and StackCubes: front camera (left) and wrist camera (right)](media/demo.gif)
+
+*Scripted policy solving PickCube, PlaceInBin and StackCubes. Left: `front` camera. Right: `wrist` camera.*
 
 - 🧩 **Language-conditioned tasks**: pick, place in a bin and stack, with randomized
   objects and colors.
