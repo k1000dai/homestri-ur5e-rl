@@ -63,13 +63,13 @@ Usable without the gym env. All poses are in the robot base frame; quaternions a
 `wxyz` (MuJoCo convention).
 
 ```python
-robot.qpos                         # (6,) arm joint positions [rad]
-robot.gripper                      # float in [0, 1], 0 = open, 1 = closed
-robot.eef_pose                     # (pos (3,), quat (4,))
-robot.set_joint_target(q)          # absolute targets for the 6 arm joints
+robot.qpos  # (6,) arm joint positions [rad]
+robot.gripper  # float in [0, 1], 0 = open, 1 = closed
+robot.eef_pose  # (pos (3,), quat (4,))
+robot.set_joint_target(q)  # absolute targets for the 6 arm joints
 robot.set_eef_target(pos, quat=None)  # IK -> joint targets; quat=None keeps current orientation
-robot.set_gripper(g)               # 0..1
-robot.move_joints(q, duration=2.0) # interpolate and step the sim (blocking)
+robot.set_gripper(g)  # 0..1
+robot.move_joints(q, duration=2.0)  # interpolate and step the sim (blocking)
 robot.move_eef(pos, quat=None, duration=2.0)
 ```
 
@@ -150,3 +150,15 @@ Cube positions and the target cube color are randomized from the reset seed. A
 
 - `.pre-commit-config.yaml` with `ruff format` and `ruff check`.
 - README rewritten: install (`uv sync`), quick start, API, tasks.
+
+## Implementation notes
+
+- "Robot base frame" is a world-aligned frame at the arm mount (`base` site); x points
+  toward the table. This avoids the 90° yaw of the UR5e base body.
+- Arm bodies use `gravcomp="1"` so position targets are tracked without sag.
+- Delta actions (`joint_delta`, `eef_delta`) accumulate on the previous commanded target,
+  not the measured state; the EEF target is kept within `2 * max_delta_pos` of the
+  measured pose.
+- `StackCubes` randomizes the color pair ("stack the X cube on the Y cube") instead of
+  always red-on-blue.
+- Each task provides `scripted_targets()` used by `homestri.scripted.ScriptedPickPlace`.

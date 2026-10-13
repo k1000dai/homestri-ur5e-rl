@@ -1,60 +1,122 @@
-# homestri-ur5e-rl
+# homestri
 
-Welcome to the **homestri-ur5e-rl** repository! This repository provides a Mujoco Gymnasium Environment designed for manipulating flexible objects using a UR5e robot arm and a Robotiq 2F-85 gripper.
+MuJoCo pick-and-place environments with a UR5e arm and a Robotiq 2F-85 gripper, built
+for VLA (vision-language-action) experiments. Gymnasium API, camera images + proprio +
+language instruction, and a simple joint / end-effector command API.
 
-![Robot Manipulation](media/wire_manipulation.gif)
+![Stack cubes demo](media/stack_cubes.gif)
 
-## Overview
+## Install
 
-The key features of this repository are:
-
-- **Mujoco Simulation**: The repository contains an example Mujoco XML configuration featuring a UR5e robot arm with an attached Robotiq 2F-85 gripper. This setup allows the robot to interact with a flexible cable in a simulated environment.
-
-- **Gymnasium Integration**: The environment is seamlessly integrated into the Gymnasium framework and comes with a graphical user interface (GUI) that visualizes the Mujoco simulation. This GUI provides an interactive way to observe the robot's actions and interactions.
-
-- **Controller Variety**: The UR5e robot arm offers multiple controller options, enabling various modes of control, including:
-  - Joint effort controller
-  - Joint velocity controller
-  - Joint position controller
-  - Operational space controller
-  
-- **Teleoperation**: For manual control, keyboard input is supported, allowing teleoperation of the robot in task space. This can be particularly useful for specific tasks that require direct human intervention.
-
-## Repository Information
-
-Please note the following details about this repository:
-
-- **Maintenance and Status**: This repository is not actively maintained and should be considered experimental. It was created during the initial stages of learning Mujoco.
-
-- **References**: The development of this repository drew inspiration from the following repositories:
-  - [ARISE-Initiative/robosuite.git](https://github.com/ARISE-Initiative/robosuite.git)
-  - [ir-lab/irl_control.git](https://github.com/ir-lab/irl_control.git)
-  - [abr/abr_control.git](https://github.com/abr/abr_control.git)
-
-## Installation
-
-Follow these steps to set up the environment:
-
-1. Clone the repository:
-   ```
-   git clone https://github.com/ian-chuang/homestri-ur5e-rl.git
-   ```
-
-2. Navigate to the repository directory:
-   ```
-   cd homestri-ur5e-rl
-   ```
-
-3. Install the required packages using pip:
-   ```
-   pip install -e .
-   ```
-
-## Testing the Environment
-
-To test the environment, you can execute the following command:
-```
-python scripts/test_base_robot_env.py
+```bash
+uv sync
 ```
 
-Feel free to explore and experiment with the capabilities of the **homestri-ur5e-rl** environment. Keep in mind that this repository is an experimental project and might not receive regular updates. If you encounter issues or have questions, refer to the repository or seek support from the developer community.
+Requires Python ≥ 3.10. Dependencies: `mujoco`, `gymnasium`, `numpy`.
+
+## Quick start
+
+```python
+import gymnasium as gym
+import homestri  # registers the environments
+
+env = gym.make("homestri/PickCube-v0", control_mode="eef_delta")
+obs, info = env.reset(seed=0)
+print(info["instruction"])            # e.g. "pick up the red cube"
+obs["images"]["front"], obs["images"]["wrist"]   # (224, 224, 3) uint8
+obs["state"]                          # qpos, gripper, eef_pos, eef_quat
+
+obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
+```
+
+Render a scripted demo to video, or watch it in the interactive viewer:
+
+```bash
+uv run python scripts/render_demo.py --env homestri/StackCubes-v0 --out stack.mp4
+uv run mjpython scripts/view.py --env homestri/PlaceInBin-v0   # macOS: mjpython, Linux: python
+```
+
+## Tasks
+
+| env id | instruction | success |
+|---|---|---|
+| `homestri/PickCube-v0` | "pick up the {color} cube" | cube lifted 10 cm and held by both fingers |
+| `homestri/PlaceInBin-v0` | "put the {color} cube in the bin" | cube resting inside the bin, released |
+| `homestri/StackCubes-v0` | "stack the {a} cube on the {b} cube" | cube a resting on cube b, released |
+
+Cube positions, yaws, colors and the bin position are randomized from the reset seed.
+Reward is `1.0` on success (which also terminates the episode); episodes truncate after
+`max_episode_steps` (default 200). Pass `task_kwargs={"num_distractors": n}` to change the
+number of extra cubes.
+
+## Environment options
+
+```python
+gym.make(
+    "homestri/PickCube-v0",
+    control_mode="eef_delta",       # joint_pos | joint_delta | eef_pose | eef_delta
+    obs_mode="rgb",                 # rgb | state
+    camera_names=("front", "wrist"),
+    image_size=(224, 224),
+    control_hz=10,
+    render_mode=None,               # rgb_array | human
+    max_episode_steps=200,
+)
+```
+
+| control_mode | action | |
+|---|---|---|
+| `joint_pos` | (7,) | 6 absolute joint positions [rad] + gripper |
+| `joint_delta` | (7,) | 6 joint deltas + gripper |
+| `eef_pose` | (8,) | position (3) + quaternion wxyz (4) + gripper |
+| `eef_delta` | (7,) | Δposition (3) + Δrotation vector (3) + gripper |
+
+Poses are in the robot base frame: origin at the arm mount, axes aligned with the world,
+x pointing toward the table. The gripper command is in `[0, 1]` (0 = open). EEF commands
+are converted to joint targets with damped-least-squares IK; `info["ik_error"]` reports
+the residual position error. Delta actions accumulate on the previous commanded target.
+
+## Robot API
+
+The `Robot` class works without the gym wrapper:
+
+```python
+import mujoco
+from homestri import Robot, build_model
+
+model = build_model()
+data = mujoco.MjData(model)
+robot = Robot(model, data)
+robot.reset()
+mujoco.mj_forward(model, data)
+
+robot.qpos, robot.gripper, robot.eef_pose
+robot.move_eef([0.5, 0.1, 0.05], duration=2.0)   # blocking, straight-line motion
+robot.set_gripper(1.0); robot.step(500)
+robot.move_joints(robot.qpos + 0.1, duration=1.0)
+
+robot.set_joint_target(q)          # non-blocking: set targets, then step the sim yourself
+robot.set_eef_target(pos, quat)    # returns IKResult(qpos, pos_error, rot_error)
+```
+
+## Adding a task
+
+Subclass `homestri.tasks.Task`, implement `objects_xml`, `reset`, `success` and
+`scripted_targets`, then pass an instance: `ManipEnv(task=MyTask())`, or add it to
+`homestri.tasks.TASKS` and `homestri.envs.registration.ENV_IDS`.
+
+## Development
+
+```bash
+uv run pytest
+uv run pre-commit install   # ruff format + ruff check
+```
+
+## Credits
+
+Robot meshes come from the original
+[ian-chuang/homestri-ur5e-rl](https://github.com/ian-chuang/homestri-ur5e-rl), which drew
+on [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie),
+[robosuite](https://github.com/ARISE-Initiative/robosuite),
+[irl_control](https://github.com/ir-lab/irl_control) and
+[abr_control](https://github.com/abr/abr_control).
