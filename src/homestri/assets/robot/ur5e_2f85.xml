@@ -164,7 +164,7 @@
                           <geom class="2f85:visual" mesh="2f85:base" material="2f85:black" />
                           <geom class="2f85:collision" mesh="2f85:base" />
                           <site name="eef" pos="0 0 0.145" type="sphere" group="4" rgba="0.9 0.9 0.9 1" size="0.005" />
-                          <camera name="wrist" pos="0 -0.085 0.02" xyaxes="1 0 0 0 -1 0.3" fovy="80" />
+                          <camera name="wrist" pos="-0.09 0 0.01" xyaxes="0 -1 0 -0.958 0 0.287" fovy="75" />
                           <body name="2f85:right_driver" gravcomp="1" pos="0 0.0306011 0.054904">
                             <inertial mass="0.00899563" pos="2.96931e-12 0.0177547 0.00107314" quat="0.681301 0.732003 0 0" diaginertia="1.72352e-06 1.60906e-06 3.22006e-07" />
                             <joint name="2f85:right_driver_joint" class="2f85:driver" />
